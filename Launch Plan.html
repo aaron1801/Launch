@@ -1,0 +1,1229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Founder's Launchpad: 5-Phase Progress Tracker (Local Storage)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #263238; /* Dark Blue-Gray */
+            color: #CFD8DC; /* Light Gray-Blue */
+        }
+        .progress-circle {
+            position: relative;
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: conic-gradient(#8BC34A var(--progress, 0%), #4A5568 var(--progress, 0%)); /* Green for progress, Gray for background */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: #CFD8DC;
+            box-shadow: inset 0 0 0 8px #263238; /* Inner shadow to create ring effect */
+        }
+        .progress-circle::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 60px; /* Inner circle size */
+            height: 60px;
+            border-radius: 50%;
+            background-color: #263238; /* Matches body background */
+        }
+        .progress-circle span {
+            position: relative;
+            z-index: 1;
+        }
+        /* Larger circle for overall progress */
+        .overall-progress-circle {
+            width: 120px;
+            height: 120px;
+            box-shadow: inset 0 0 0 12px #263238;
+        }
+        .overall-progress-circle::after {
+            width: 90px;
+            height: 90px;
+        }
+        .overall-progress-circle span {
+            font-size: 1.5rem;
+        }
+
+        .phase-card {
+            background-color: rgba(255, 255, 255, 0.05); /* Slightly transparent white for cards */
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.2s ease-in-out;
+            display: flex; /* Ensure flex for internal layout */
+            flex-direction: column; /* Stack content vertically */
+            justify-content: space-between; /* Push button to bottom */
+            min-height: 250px; /* Ensure cards have a consistent minimum height */
+        }
+        .phase-card.completed {
+            border-color: #8BC34A; /* Green border for completed phases */
+        }
+        .phase-card:hover {
+            transform: translateY(-5px);
+        }
+        .btn-primary {
+            background-color: #42A5F5; /* Bright Blue */
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: background-color 0.2s ease-in-out;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+        .btn-primary:hover {
+            background-color: #2196F3; /* Slightly darker blue on hover */
+        }
+        .btn-secondary {
+            background-color: #8BC34A; /* Lime Green */
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: background-color 0.2s ease-in-out;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+        .btn-secondary:hover {
+            background-color: #7CB342; /* Slightly darker green on hover */
+        }
+        .btn-edit {
+            background-color: #FFC107; /* Amber */
+            color: #333;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.8em;
+            font-weight: 600;
+            transition: background-color 0.2s ease-in-out;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        .btn-edit:hover {
+            background-color: #FFB300; /* Darker Amber */
+        }
+        .btn-delete {
+            background-color: transparent; /* Make background transparent */
+            border: 1px solid rgba(244, 67, 54, 0.5); /* Subtle red border */
+            color: #F44336; /* Red 'X' */
+            padding: 2px 6px; /* Smaller padding */
+            border-radius: 9999px; /* Fully rounded */
+            font-size: 0.6em; /* Smaller font size for 'X' */
+            font-weight: 600;
+            transition: all 0.2s ease-in-out; /* Smooth transition for hover */
+            margin-left: 8px;
+            cursor: pointer;
+        }
+        .btn-delete:hover {
+            background-color: rgba(244, 67, 54, 0.2); /* Light red fill on hover */
+            color: white; /* White 'X' on hover */
+        }
+        .btn-add {
+            background-color: #4CAF50; /* Green */
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.7em;
+            font-weight: 600;
+            transition: background-color 0.2s ease-in-out;
+            margin-left: 8px;
+        }
+        .btn-add:hover {
+            background-color: #388E3C; /* Darker Green */
+        }
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            color: white;
+            font-size: 1.5rem;
+        }
+        .deliverables-section, .notes-section {
+            max-height: 250px; /* Increased height for scrollability */
+            overflow-y: auto;
+            background-color: rgba(0, 0, 0, 0.1);
+            border-radius: 6px;
+            padding: 10px;
+            margin-top: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .deliverables-section::-webkit-scrollbar, .notes-section::-webkit-scrollbar {
+            width: 8px;
+        }
+        .deliverables-section::-webkit-scrollbar-track, .notes-section::-webkit-scrollbar-track {
+            background: #263238;
+            border-radius: 10px;
+        }
+        .deliverables-section::-webkit-scrollbar-thumb, .notes-section::-webkit-scrollbar-thumb {
+            background: #4A5568;
+            border-radius: 10px;
+        }
+        .deliverables-section::-webkit-scrollbar-thumb:hover, .notes-section::-webkit-scrollbar-thumb:hover {
+            background: #606C81;
+        }
+        .deliverable-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+        }
+        .deliverable-item input[type="checkbox"] {
+            margin-right: 10px;
+            width: 18px;
+            height: 18px;
+            accent-color: #8BC34A; /* Green checkbox */
+        }
+        .deliverable-item label {
+            cursor: pointer;
+            flex-grow: 1; /* Allow label to take up space */
+        }
+        .deliverable-item.completed-item label {
+            text-decoration: line-through;
+            color: #718096; /* Gray out completed items */
+        }
+        /* Styles for notes and document link fields */
+        .notes-section textarea, .notes-section input[type="url"] {
+            width: 100%;
+            background-color: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            padding: 8px;
+            color: #CFD8DC;
+            margin-bottom: 10px;
+            resize: vertical; /* Allow vertical resizing for textarea */
+        }
+        .notes-section textarea:focus, .notes-section input[type="url"]:focus {
+            outline: none;
+            border-color: #42A5F5;
+        }
+        /* Styles for editable phase title and description */
+        .editable-title, .editable-description {
+            background-color: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            padding: 4px 8px;
+            color: #CFD8DC;
+            width: 100%;
+            margin-bottom: 8px;
+        }
+        .editable-title {
+            font-size: 1.5rem; /* Adjust as needed */
+            font-weight: bold;
+        }
+        .editable-description {
+            font-size: 0.9em; /* Adjust as needed */
+            min-height: 50px; /* Ensure textarea is visible */
+            resize: vertical;
+        }
+        .editable-title:focus, .editable-description:focus {
+            outline: none;
+            border-color: #42A5F5;
+        }
+        /* Styles for Export/Import section */
+        .data-management-section {
+            background-color: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            margin-top: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: center;
+            align-items: center;
+        }
+        .data-management-section button, .data-management-section input[type="file"] {
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out;
+        }
+        .data-management-section .btn-export {
+            background-color: #FF7043; /* Orange */
+            color: white;
+        }
+        .data-management-section .btn-export:hover {
+            background-color: #F4511E; /* Darker Orange */
+        }
+        .data-management-section .btn-import {
+            background-color: #66BB6A; /* Light Green */
+            color: white;
+        }
+        .data-management-section .btn-import:hover {
+            background-color: #4CAF50; /* Darker Green */
+        }
+        .data-management-section input[type="file"] {
+            background-color: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #CFD8DC;
+            flex-grow: 1;
+            max-width: 250px;
+        }
+        .data-management-section .btn-reset { /* New style for reset button */
+            background-color: #9E9E9E; /* Gray */
+            color: white;
+        }
+        .data-management-section .btn-reset:hover {
+            background-color: #757575; /* Darker Gray */
+        }
+
+        /* Custom Modal Styles */
+        .custom-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            color: white;
+        }
+        .custom-modal-content {
+            background-color: #263238;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+        }
+        .custom-modal-content p {
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+            color: #CFD8DC;
+        }
+        .custom-modal-content input[type="text"] {
+            width: calc(100% - 16px); /* Account for padding */
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            background-color: rgba(255, 255, 255, 0.1);
+            color: #CFD8DC;
+        }
+        .custom-modal-content input[type="text"]:focus {
+            outline: none;
+            border-color: #42A5F5;
+        }
+        .custom-modal-content .modal-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+        }
+        .custom-modal-content .modal-buttons button {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out;
+        }
+        .custom-modal-content .modal-buttons .btn-confirm {
+            background-color: #4CAF50; /* Green */
+            color: white;
+        }
+        .custom-modal-content .modal-buttons .btn-confirm:hover {
+            background-color: #388E3C;
+        }
+        .custom-modal-content .modal-buttons .btn-cancel {
+            background-color: #F44336; /* Red */
+            color: white;
+        }
+        .custom-modal-content .modal-buttons .btn-cancel:hover {
+            background-color: #D32F2F;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div id="loading-overlay" class="loading-overlay">
+        Loading Launchpad...
+    </div>
+
+    <div class="container mx-auto max-w-6xl">
+        <header class="text-center mb-12">
+            <h1 class="text-4xl md:text-6xl font-bold mb-2" style="color: #42A5F5;">Founder's Launchpad</h1>
+            <p class="text-xl md:text-2xl text-[#CFD8DC]">Your Roadmap to Business Success</p>
+        </header>
+
+        <main>
+            <!-- Overall Progress Dashboard -->
+            <section class="bg-white/10 rounded-2xl shadow-2xl p-6 md:p-8 backdrop-blur-sm border border-white/20 mb-12 text-center">
+                <h2 class="text-3xl font-bold mb-4" style="color: #8BC34A;">Overall Launch Progress</h2>
+                <div class="flex items-center justify-center my-4">
+                    <div class="progress-circle overall-progress-circle" id="overall-progress-circle" style="--progress: 0%;">
+                        <span>0%</span>
+                    </div>
+                </div>
+                <p class="text-lg text-gray-300" id="overall-status">Status: Not Started</p>
+            </section>
+
+            <!-- Data Management Section (Export/Import/Reset) -->
+            <section class="data-management-section mb-12">
+                <button id="export-data-button" class="btn-export">Export Data (JSON)</button>
+                <input type="file" id="import-file-input" accept=".json">
+                <button id="import-data-button" class="btn-import">Import Data</button>
+                <button id="reset-data-button" class="btn-reset">Reset All Data</button>
+            </section>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <!-- Phase 1 Card -->
+                <div id="phase-1-card" class="phase-card p-6">
+                    <div>
+                        <input type="text" id="phase-1-title" class="editable-title text-[#42A5F5]" value="Phase 1: Strategize">
+                        <textarea id="phase-1-description" class="editable-description text-[#CFD8DC]" rows="2">This phase is all about validating your core idea and establishing a deep understanding of your market.</textarea>
+                        <div class="flex items-center justify-center my-4">
+                            <div class="progress-circle" id="phase-1-progress-circle" style="--progress: 0%;">
+                                <span>0%</span>
+                            </div>
+                        </div>
+                        <p class="text-center text-sm text-gray-400" id="phase-1-status">Status: Not Started</p>
+                        <div class="deliverables-section mt-4">
+                            <h4 class="font-semibold mb-2 text-white flex justify-between items-center">
+                                Deliverables:
+                                <button id="add-deliverable-phase-1" class="btn-add">Add</button>
+                            </h4>
+                            <ul id="phase-1-deliverables-list"></ul>
+                        </div>
+                        <div class="notes-section mt-4">
+                            <h4 class="font-semibold mb-2 text-white">Notes & Links:</h4>
+                            <textarea id="phase-1-notes" rows="3" placeholder="Add your notes here..."></textarea>
+                            <input type="url" id="phase-1-document-link" placeholder="Link to document (e.g., Pitch Deck URL)">
+                            <a id="phase-1-link-preview" href="#" target="_blank" class="text-sm text-[#42A5F5] hover:underline mt-2 block" style="display: none;">View Document</a>
+                        </div>
+                    </div>
+                    <button id="phase-1-toggle-button" class="btn-primary mt-6 w-full">Mark Phase Complete</button>
+                </div>
+
+                <!-- Phase 2 Card -->
+                <div id="phase-2-card" class="phase-card p-6">
+                    <div>
+                        <input type="text" id="phase-2-title" class="editable-title text-[#42A5F5]" value="Phase 2: Structure">
+                        <textarea id="phase-2-description" class="editable-description text-[#CFD8DC]" rows="2">Here, you formalize your strategic blueprint and establish the necessary legal and financial groundwork.</textarea>
+                        <div class="flex items-center justify-center my-4">
+                            <div class="progress-circle" id="phase-2-progress-circle" style="--progress: 0%;">
+                                <span>0%</span>
+                            </div>
+                        </div>
+                        <p class="text-center text-sm text-gray-400" id="phase-2-status">Status: Not Started</p>
+                        <div class="deliverables-section mt-4">
+                            <h4 class="font-semibold mb-2 text-white flex justify-between items-center">
+                                Deliverables:
+                                <button id="add-deliverable-phase-2" class="btn-add">Add</button>
+                            </h4>
+                            <ul id="phase-2-deliverables-list"></ul>
+                        </div>
+                        <div class="notes-section mt-4">
+                            <h4 class="font-semibold mb-2 text-white">Notes & Links:</h4>
+                            <textarea id="phase-2-notes" rows="3" placeholder="Add your notes here..."></textarea>
+                            <input type="url" id="phase-2-document-link" placeholder="Link to document (e.g., Business Plan URL)">
+                            <a id="phase-2-link-preview" href="#" target="_blank" class="text-sm text-[#42A5F5] hover:underline mt-2 block" style="display: none;">View Document</a>
+                        </div>
+                    </div>
+                    <button id="phase-2-toggle-button" class="btn-primary mt-6 w-full">Mark Phase Complete</button>
+                </div>
+
+                <!-- Phase 3 Card -->
+                <div id="phase-3-card" class="phase-card p-6">
+                    <div>
+                        <input type="text" id="phase-3-title" class="editable-title text-[#42A5F5]" value="Phase 3: Build">
+                        <textarea id="phase-3-description" class="editable-description text-[#CFD8DC]" rows="2">This phase centers on developing your Minimum Viable Offering (MVO) and establishing core operational capabilities.</textarea>
+                        <div class="flex items-center justify-center my-4">
+                            <div class="progress-circle" id="phase-3-progress-circle" style="--progress: 0%;">
+                                <span>0%</span>
+                            </div>
+                        </div>
+                        <p class="text-center text-sm text-gray-400" id="phase-3-status">Status: Not Started</p>
+                        <div class="deliverables-section mt-4">
+                            <h4 class="font-semibold mb-2 text-white flex justify-between items-center">
+                                Deliverables:
+                                <button id="add-deliverable-phase-3" class="btn-add">Add</button>
+                            </h4>
+                            <ul id="phase-3-deliverables-list"></ul>
+                        </div>
+                        <div class="notes-section mt-4">
+                            <h4 class="font-semibold mb-2 text-white">Notes & Links:</h4>
+                            <textarea id="phase-3-notes" rows="3" placeholder="Add your notes here..."></textarea>
+                            <input type="url" id="phase-3-document-link" placeholder="Link to document (e.g., MVO Specs URL)">
+                            <a id="phase-3-link-preview" href="#" target="_blank" class="text-sm text-[#42A5F5] hover:underline mt-2 block" style="display: none;">View Document</a>
+                        </div>
+                    </div>
+                    <button id="phase-3-toggle-button" class="btn-primary mt-6 w-full">Mark Phase Complete</button>
+                </div>
+
+                <!-- Phase 4 Card -->
+                <div id="phase-4-card" class="phase-card p-6">
+                    <div>
+                        <input type="text" id="phase-4-title" class="editable-title text-[#42A5F5]" value="Phase 4: Launch">
+                        <textarea id="phase-4-description" class="editable-description text-[#CFD8DC]" rows="2">Now, you introduce your venture to the market, focusing on strategic customer acquisition and early validation.</textarea>
+                        <div class="flex items-center justify-center my-4">
+                            <div class="progress-circle" id="phase-4-progress-circle" style="--progress: 0%;">
+                                <span>0%</span>
+                            </div>
+                        </div>
+                        <p class="text-center text-sm text-gray-400" id="phase-4-status">Status: Not Started</p>
+                        <div class="deliverables-section mt-4">
+                            <h4 class="font-semibold mb-2 text-white flex justify-between items-center">
+                                Deliverables:
+                                <button id="add-deliverable-phase-4" class="btn-add">Add</button>
+                            </h4>
+                            <ul id="phase-4-deliverables-list"></ul>
+                        </div>
+                        <div class="notes-section mt-4">
+                            <h4 class="font-semibold mb-2 text-white">Notes & Links:</h4>
+                            <textarea id="phase-4-notes" rows="3" placeholder="Add your notes here..."></textarea>
+                            <input type="url" id="phase-4-document-link" placeholder="Link to document (e.g., GTM Strategy URL)">
+                            <a id="phase-4-link-preview" href="#" target="_blank" class="text-sm text-[#42A5F5] hover:underline mt-2 block" style="display: none;">View Document</a>
+                        </div>
+                    </div>
+                    <button id="phase-4-toggle-button" class="btn-primary mt-6 w-full">Mark Phase Complete</button>
+                </div>
+
+                <!-- Phase 5 Card -->
+                <div id="phase-5-card" class="phase-card p-6">
+                    <div>
+                        <input type="text" id="phase-5-title" class="editable-title text-[#42A5F5]" value="Phase 5: Scale">
+                        <textarea id="phase-5-description" class="editable-description text-[#CFD8DC]" rows="2">The final, ongoing phase is about driving continuous improvement and sustainable growth.</textarea>
+                        <div class="flex items-center justify-center my-4">
+                            <div class="progress-circle" id="phase-5-progress-circle" style="--progress: 0%;">
+                                <span>0%</span>
+                            </div>
+                        </div>
+                        <p class="text-center text-sm text-gray-400" id="phase-5-status">Status: Not Started</p>
+                        <div class="deliverables-section mt-4">
+                            <h4 class="font-semibold mb-2 text-white flex justify-between items-center">
+                                Deliverables:
+                                <button id="add-deliverable-phase-5" class="btn-add">Add</button>
+                            </h4>
+                            <ul id="phase-5-deliverables-list"></ul>
+                        </div>
+                        <div class="notes-section mt-4">
+                            <h4 class="font-semibold mb-2 text-white">Notes & Links:</h4>
+                            <textarea id="phase-5-notes" rows="3" placeholder="Add your notes here..."></textarea>
+                            <input type="url" id="phase-5-document-link" placeholder="Link to document (e.g., Performance Report URL)">
+                            <a id="phase-5-link-preview" href="#" target="_blank" class="text-sm text-[#42A5F5] hover:underline mt-2 block" style="display: none;">View Document</a>
+                        </div>
+                    </div>
+                    <button id="phase-5-toggle-button" class="btn-primary mt-6 w-full">Mark Phase Complete</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Custom Modal HTML -->
+    <div id="custom-modal-overlay" class="custom-modal-overlay hidden">
+        <div class="custom-modal-content">
+            <p id="custom-modal-message" class="text-lg mb-4 text-white"></p>
+            <input type="text" id="custom-modal-input" class="w-full p-2 rounded bg-white/10 border border-white/20 text-white placeholder-gray-400 mb-4 hidden" placeholder="Enter text...">
+            <div class="modal-buttons flex justify-center space-x-4">
+                <button id="custom-modal-confirm-btn" class="btn-confirm">Confirm</button>
+                <button id="custom-modal-cancel-btn" class="btn-cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // DOM elements
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const overallProgressCircle = document.getElementById('overall-progress-circle');
+        const overallStatusText = document.getElementById('overall-status');
+        const exportDataButton = document.getElementById('export-data-button');
+        const importFileInput = document.getElementById('import-file-input');
+        const importDataButton = document.getElementById('import-data-button');
+        const resetDataButton = document.getElementById('reset-data-button');
+
+        // Custom Modal Elements
+        const customModalOverlay = document.getElementById('custom-modal-overlay');
+        const customModalMessage = document.getElementById('custom-modal-message');
+        const customModalInput = document.getElementById('custom-modal-input');
+        const customModalConfirmBtn = document.getElementById('custom-modal-confirm-btn');
+        const customModalCancelBtn = document.getElementById('custom-modal-cancel-btn');
+
+        let resolveModalPromise; // To hold the resolve function for the modal promise
+
+        /**
+         * Shows a custom confirmation dialog.
+         * @param {string} message - The message to display.
+         * @returns {Promise<boolean>} - Resolves with true if confirmed, false if cancelled.
+         */
+        function showConfirmModal(message) {
+            customModalMessage.textContent = message;
+            customModalInput.classList.add('hidden'); // Hide input
+            customModalConfirmBtn.classList.remove('hidden'); // Show confirm button
+            customModalCancelBtn.classList.remove('hidden'); // Show cancel button
+            customModalConfirmBtn.textContent = 'Confirm'; // Ensure text is "Confirm"
+            customModalOverlay.classList.remove('hidden');
+
+            return new Promise(resolve => {
+                resolveModalPromise = resolve;
+                customModalConfirmBtn.onclick = () => {
+                    customModalOverlay.classList.add('hidden');
+                    resolveModalPromise(true);
+                };
+                customModalCancelBtn.onclick = () => {
+                    customModalOverlay.classList.add('hidden');
+                    resolveModalPromise(false);
+                };
+            });
+        }
+
+        /**
+         * Shows a custom prompt dialog.
+         * @param {string} message - The message to display.
+         * @param {string} placeholder - The placeholder text for the input.
+         * @param {string} initialValue - Initial value for the input.
+         * @returns {Promise<string|null>} - Resolves with the input value or null if cancelled.
+         */
+        function showPromptModal(message, placeholder = '', initialValue = '') {
+            customModalMessage.textContent = message;
+            customModalInput.value = initialValue;
+            customModalInput.placeholder = placeholder;
+            customModalInput.classList.remove('hidden'); // Show input
+            customModalConfirmBtn.classList.remove('hidden'); // Show confirm button
+            customModalCancelBtn.classList.remove('hidden'); // Show cancel button
+            customModalConfirmBtn.textContent = 'OK'; // Change text to "OK" for prompts
+            customModalOverlay.classList.remove('hidden');
+            customModalInput.focus(); // Focus on the input field
+
+            return new Promise(resolve => {
+                resolveModalPromise = resolve;
+                customModalConfirmBtn.onclick = () => {
+                    customModalOverlay.classList.add('hidden');
+                    resolveModalPromise(customModalInput.value);
+                };
+                customModalCancelBtn.onclick = () => {
+                    customModalOverlay.classList.add('hidden');
+                    resolveModalPromise(null);
+                };
+                customModalInput.onkeypress = (e) => {
+                    if (e.key === 'Enter') {
+                        customModalConfirmBtn.click(); // Trigger confirm on Enter
+                    }
+                };
+            });
+        }
+
+        /**
+         * Shows a custom alert dialog.
+         * @param {string} message - The message to display.
+         * @returns {Promise<void>} - Resolves when OK is clicked.
+         */
+        function showAlertModal(message) {
+            customModalMessage.textContent = message;
+            customModalInput.classList.add('hidden'); // Hide input
+            customModalCancelBtn.classList.add('hidden'); // Hide cancel button
+            customModalConfirmBtn.classList.remove('hidden'); // Show only confirm button (acts as OK)
+            customModalConfirmBtn.textContent = 'OK'; // Change text to OK
+            customModalOverlay.classList.remove('hidden');
+
+            return new Promise(resolve => {
+                resolveModalPromise = resolve;
+                customModalConfirmBtn.onclick = () => {
+                    customModalOverlay.classList.add('hidden');
+                    customModalConfirmBtn.textContent = 'Confirm'; // Reset text for next use
+                    resolveModalPromise();
+                };
+            });
+        }
+
+
+        // Predefined phase data (initial descriptions, deliverables)
+        // This acts as the default template when no saved data is found.
+        const defaultPhaseData = {
+            'phase-1': {
+                title: 'Phase 1: Strategize',
+                description: 'This phase is all about validating your core idea and establishing a deep understanding of your market.',
+                deliverables: [
+                    "Refined Business Concept Document", "Founder's Agreement", "Completed Market Research Report",
+                    "User Persona(s)", "MVO Scope Definition Document", "Prioritization Matrix/List",
+                    "Initial Business Model Canvas / Lean Canvas (iterated versions)", "Feasibility Study Report"
+                ]
+            },
+            'phase-2': {
+                title: 'Phase 2: Structure',
+                description: 'Here, you formalize your strategic blueprint and establish the necessary legal and financial groundwork.',
+                deliverables: [
+                    "Completed Comprehensive Business Plan (or Lean Plan/Pitch Deck)", "Initial Vision/Traction Organizer (V/TO)",
+                    "Detailed Financial Projections (Startup Costs, P&L, Cash Flow)", "Registered Business Entity (e.g., LLC formation documents)",
+                    "Obtained EIN", "IP Protection Filings (if applicable)"
+                ]
+            },
+            'phase-3': {
+                title: 'Phase 3: Build',
+                description: 'This phase centers on developing your Minimum Viable Offering (MVO) and establishing core operational capabilities.',
+                deliverables: [
+                    "Brand Style Guide (logo, color palette, typography)", "Secured Domain Name and Social Media Handles",
+                    "Functional Minimum Viable Offering (MVO)", "Established Supplier/Vendor Contracts",
+                    "Operational Business Bank Account", "Obtained All Required Licenses & Permits",
+                    "BPMN Diagram(s) for Core Processes", "Initial Value Stream Map(s)",
+                    "Defined Service Delivery Processes/SOPs (for service businesses)", "Acquired Essential Equipment/Vehicles"
+                ]
+            },
+            'phase-4': {
+                title: 'Phase 4: Launch',
+                description: 'Now, you introduce your venture to the market, focusing on strategic customer acquisition and early validation.',
+                deliverables: [
+                    "Comprehensive Go-to-Market (GTM) Strategy Document", "Customer Success and Retention Strategy Document",
+                    "Completed Marketing Plan", "Launch-Ready Website/E-commerce Platform",
+                    "Marketing Collateral (e.g., social media content, ad creatives)", "Configured CRM System",
+                    "Pre-launch Campaign Assets"
+                ]
+            },
+            'phase-5': {
+                title: 'Phase 5: Scale',
+                description: 'The final, ongoing phase is about driving continuous improvement and sustainable growth.',
+                deliverables: [
+                    "Regular Performance Reports (Sales, Marketing, Financial)", "Customer Feedback Reports/Surveys",
+                    "Updated Product/Service Roadmaps", "Optimized Operational Procedures",
+                    "Annual Tax Filings and Compliance Audits", "Implemented EOS Scorecard",
+                    "Defined Quarterly Rocks"
+                ]
+            }
+        };
+
+        // Client-side state for phases
+        let phasesState = {};
+
+        /**
+         * Utility function to debounce input events.
+         * @param {Function} func - The function to debounce.
+         * @param {number} delay - The delay in milliseconds.
+         */
+        const debounce = (func, delay) => {
+            let timeout;
+            return function(...args) {
+                const context = this;
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(context, args), delay);
+            };
+        };
+
+        /**
+         * Initializes phasesState, attempting to load from localStorage.
+         * If no data is found or it's invalid, it defaults to the predefined data.
+         * Ensures all predefined deliverables, notes, and document links are present, defaulting if not in saved state.
+         */
+        function initializePhasesState() {
+            try {
+                const savedState = localStorage.getItem('founderLaunchpadPhases');
+                if (savedState) {
+                    const loadedState = JSON.parse(savedState);
+                    console.log("[Local Storage] Loaded raw state:", loadedState);
+
+                    // Merge loaded state with default structure to ensure all elements are present
+                    for (let i = 1; i <= 5; i++) {
+                        const phaseKey = `phase-${i}`;
+                        const defaultPhase = defaultPhaseData[phaseKey];
+                        const loadedPhase = loadedState[phaseKey] || {};
+
+                        phasesState[phaseKey] = {
+                            title: loadedPhase.title || defaultPhase.title,
+                            description: loadedPhase.description || defaultPhase.description,
+                            status: loadedPhase.status || 'Not Started',
+                            progress: loadedPhase.progress || 0,
+                            deliverables: [], // Initialize as array for new structure
+                            notes: loadedPhase.notes || '',
+                            documentLink: loadedPhase.documentLink || ''
+                        };
+
+                        // Populate deliverables, ensuring they are arrays of objects {text: string, completed: boolean}
+                        // Handle conversion from old {index: boolean} format if necessary
+                        if (Array.isArray(loadedPhase.deliverables)) {
+                            // If it's already an array of objects, use it directly
+                            phasesState[phaseKey].deliverables = loadedPhase.deliverables.map(d => ({
+                                text: d.text,
+                                completed: d.completed ?? false // Ensure completed is boolean
+                            }));
+                        } else if (typeof loadedPhase.deliverables === 'object' && loadedPhase.deliverables !== null) {
+                            // If it's the old {index: boolean} format, convert it
+                            // This path is for compatibility with previous versions where deliverables were {index: boolean}
+                            phasesState[phaseKey].deliverables = defaultPhase.deliverables.map((defaultText, index) => ({
+                                text: defaultText,
+                                completed: loadedPhase.deliverables[index] ?? false
+                            }));
+                        } else {
+                            // Default to predefined if no valid loaded data
+                            phasesState[phaseKey].deliverables = defaultPhase.deliverables.map(text => ({ text: text, completed: false }));
+                        }
+
+                        // Recalculate progress based on the merged deliverables
+                        phasesState[phaseKey].progress = calculatePhaseProgress(phasesState[phaseKey].deliverables);
+                        // Adjust status based on progress
+                        if (phasesState[phaseKey].progress === 100) {
+                            phasesState[phaseKey].status = 'Completed';
+                        } else if (phasesState[phaseKey].progress > 0) {
+                            phasesState[phaseKey].status = 'In Progress';
+                        } else {
+                            phasesState[phaseKey].status = 'Not Started';
+                        }
+                    }
+                    console.log("[Local Storage] Initialized and merged state:", phasesState);
+                } else {
+                    // Default initial state if nothing in localStorage
+                    for (let i = 1; i <= 5; i++) {
+                        const phaseKey = `phase-${i}`;
+                        const defaultPhase = defaultPhaseData[phaseKey];
+                        phasesState[phaseKey] = {
+                            title: defaultPhase.title,
+                            description: defaultPhase.description,
+                            status: 'Not Started',
+                            progress: 0,
+                            deliverables: defaultPhase.deliverables.map(text => ({ text: text, completed: false })),
+                            notes: '',
+                            documentLink: ''
+                        };
+                    }
+                    console.log("[Local Storage] Initialized default state.");
+                }
+            } catch (e) {
+                console.error("[Local Storage Error] Failed to load state from localStorage, initializing default:", e);
+                // Fallback to default if there's an error parsing
+                for (let i = 1; i <= 5; i++) {
+                    const phaseKey = `phase-${i}`;
+                    const defaultPhase = defaultPhaseData[phaseKey];
+                    phasesState[phaseKey] = {
+                        title: defaultPhase.title,
+                        description: defaultPhase.description,
+                        status: 'Not Started',
+                        progress: 0,
+                        deliverables: defaultPhase.deliverables.map(text => ({ text: text, completed: false })),
+                        notes: '',
+                        documentLink: ''
+                    };
+                }
+            }
+        }
+
+        /**
+         * Saves the current phasesState to localStorage.
+         */
+        function savePhasesState() {
+            try {
+                localStorage.setItem('founderLaunchpadPhases', JSON.stringify(phasesState));
+                console.log("[Local Storage] State saved.");
+            } catch (e) {
+                console.error("[Local Storage Error] Failed to save state to localStorage:", e);
+            }
+        }
+
+        /**
+         * Calculates phase progress based on completed deliverables.
+         * @param {Array<Object>} deliverables - Array of deliverable objects {text: string, completed: boolean}.
+         * @returns {number} Progress percentage.
+         */
+        function calculatePhaseProgress(deliverables) {
+            const totalDeliverables = deliverables.length;
+            if (totalDeliverables === 0) return 0;
+            const completedCount = deliverables.filter(d => d.completed).length;
+            return (completedCount / totalDeliverables) * 100;
+        }
+
+        /**
+         * Calculates the overall progress based on individual phase progress.
+         * @returns {{averageProgress: number, overallStatus: string}}
+         */
+        function calculateOverallProgress() {
+            let totalProgress = 0;
+            for (let i = 1; i <= 5; i++) {
+                const phaseKey = `phase-${i}`;
+                totalProgress += phasesState[phaseKey].progress;
+            }
+            const averageProgress = totalProgress / 5;
+            
+            let overallStatus = 'Not Started';
+            if (averageProgress > 0 && averageProgress < 100) {
+                overallStatus = 'In Progress';
+            } else if (averageProgress === 100) {
+                overallStatus = 'Completed';
+            }
+
+            return { averageProgress, overallStatus };
+        }
+
+        /**
+         * Updates the UI for the overall progress dashboard.
+         * @param {number} averageProgress - The calculated average progress percentage.
+         * @param {string} overallStatus - The calculated overall status.
+         */
+        function updateOverallProgressUI(averageProgress, overallStatus) {
+            console.log(`[UI] Updating overall progress: ${averageProgress.toFixed(0)}%, Status: ${overallStatus}`);
+            if (overallProgressCircle) {
+                overallProgressCircle.style.setProperty('--progress', `${averageProgress}%`);
+                overallProgressCircle.querySelector('span').textContent = `${Math.round(averageProgress)}%`;
+            }
+            if (overallStatusText) {
+                overallStatusText.textContent = `Status: ${overallStatus}`;
+            }
+        }
+
+        /**
+         * Updates the UI for a specific phase card, including deliverables, notes, and document links.
+         * @param {string} phaseKey - The key of the phase (e.g., 'phase-1').
+         */
+        function updatePhaseUI(phaseKey) {
+            const { title: currentTitle, description: currentDescription, status: phaseStatus, progress: phaseProgress, deliverables: currentDeliverablesState, notes: currentNotes, documentLink: currentDocumentLink } = phasesState[phaseKey];
+            console.log(`[UI] Updating UI for ${phaseKey}. Status: ${phaseStatus}, Progress: ${phaseProgress.toFixed(0)}%`);
+            console.log(`[UI]   Deliverables State for ${phaseKey}:`, currentDeliverablesState);
+            console.log(`[UI]   Notes for ${phaseKey}:`, currentNotes);
+            console.log(`[UI]   Document Link for ${phaseKey}:`, currentDocumentLink);
+
+            const card = document.getElementById(`${phaseKey}-card`);
+            const titleInput = document.getElementById(`${phaseKey}-title`);
+            const descriptionTextarea = document.getElementById(`${phaseKey}-description`);
+            const circle = document.getElementById(`${phaseKey}-progress-circle`);
+            const statusText = document.getElementById(`${phaseKey}-status`);
+            const button = document.getElementById(`${phaseKey}-toggle-button`);
+            const deliverablesList = document.getElementById(`${phaseKey}-deliverables-list`);
+            const notesTextarea = document.getElementById(`${phaseKey}-notes`);
+            const documentLinkInput = document.getElementById(`${phaseKey}-document-link`);
+            const documentLinkPreview = document.getElementById(`${phaseKey}-link-preview`);
+            const addDeliverableButton = document.getElementById(`add-deliverable-${phaseKey}`);
+
+            // Defensive checks for all elements
+            if (!card || !titleInput || !descriptionTextarea || !circle || !statusText || !button || !deliverablesList || !notesTextarea || !documentLinkInput || !documentLinkPreview || !addDeliverableButton) {
+                console.error(`[UI Error] One or more essential UI elements for ${phaseKey} not found. Aborting UI update.`);
+                return;
+            }
+
+            const progressSpan = circle.querySelector('span');
+            if (!progressSpan) {
+                console.error(`[UI Error] Progress span inside circle for ${phaseKey} not found.`);
+                return;
+            }
+
+            // Update phase title and description
+            titleInput.value = currentTitle;
+            descriptionTextarea.value = currentDescription;
+
+            // Attach event listeners for phase title and description (debounced)
+            if (!titleInput.dataset.listenerAttached) {
+                titleInput.addEventListener('input', debounce((event) => {
+                    phasesState[phaseKey].title = event.target.value;
+                    savePhasesState();
+                }, 500));
+                titleInput.dataset.listenerAttached = 'true';
+            }
+            if (!descriptionTextarea.dataset.listenerAttached) {
+                descriptionTextarea.addEventListener('input', debounce((event) => {
+                    phasesState[phaseKey].description = event.target.value;
+                    savePhasesState();
+                }, 500));
+                descriptionTextarea.dataset.listenerAttached = 'true';
+            }
+
+            // Update card class for styling
+            if (phaseStatus === 'Completed') {
+                card.classList.add('completed');
+                button.classList.remove('btn-primary');
+                button.classList.add('btn-secondary');
+                button.textContent = 'Mark Phase In Progress';
+            } else {
+                card.classList.remove('completed');
+                button.classList.remove('btn-secondary');
+                button.classList.add('btn-primary');
+                button.textContent = 'Mark Phase Complete';
+            }
+
+            // Update progress circle
+            circle.style.setProperty('--progress', `${phaseProgress}%`);
+            progressSpan.textContent = `${Math.round(phaseProgress)}%`;
+
+            // Update status text
+            statusText.textContent = `Status: ${phaseStatus}`;
+
+            // Render deliverables checklist
+            deliverablesList.innerHTML = ''; // Clear existing list
+            currentDeliverablesState.forEach((deliverable, index) => {
+                const li = document.createElement('li');
+                li.className = `deliverable-item ${deliverable.completed ? 'completed-item' : ''}`;
+                li.innerHTML = `
+                    <input type="checkbox" id="deliverable-${phaseKey}-${index}" data-phase="${phaseKey}" data-index="${index}" ${deliverable.completed ? 'checked' : ''}>
+                    <label for="deliverable-${phaseKey}-${index}">${deliverable.text}</label>
+                    <button class="btn-delete" data-phase="${phaseKey}" data-index="${index}">X</button>
+                `;
+                deliverablesList.appendChild(li);
+
+                // Attach event listener to checkbox
+                const checkbox = li.querySelector('input[type="checkbox"]');
+                checkbox.addEventListener('change', (event) => {
+                    phasesState[phaseKey].deliverables[index].completed = event.target.checked;
+                    phasesState[phaseKey].progress = calculatePhaseProgress(phasesState[phaseKey].deliverables);
+                    if (phasesState[phaseKey].progress === 100) {
+                        phasesState[phaseKey].status = 'Completed';
+                    } else if (phasesState[phaseKey].progress > 0) {
+                        phasesState[phaseKey].status = 'In Progress';
+                    } else {
+                        phasesState[phaseKey].status = 'Not Started';
+                    }
+                    updatePhaseUI(phaseKey); // Re-render to update styling and progress
+                    updateOverallProgressUI(calculateOverallProgress().averageProgress, calculateOverallProgress().overallStatus);
+                    savePhasesState();
+                });
+
+                // Attach event listener to delete button
+                const deleteButton = li.querySelector('.btn-delete');
+                deleteButton.addEventListener('click', async () => { // Made async for modal
+                    const confirmed = await showConfirmModal('Are you sure you want to delete this deliverable?');
+                    if (confirmed) {
+                        phasesState[phaseKey].deliverables.splice(index, 1);
+                        phasesState[phaseKey].progress = calculatePhaseProgress(phasesState[phaseKey].deliverables);
+                        if (phasesState[phaseKey].progress === 100) {
+                            phasesState[phaseKey].status = 'Completed';
+                        } else if (phasesState[phaseKey].progress > 0) {
+                            phasesState[phaseKey].status = 'In Progress';
+                        } else {
+                            phasesState[phaseKey].status = 'Not Started';
+                        }
+                        updatePhaseUI(phaseKey);
+                        updateOverallProgressUI(calculateOverallProgress().averageProgress, calculateOverallProgress().overallStatus);
+                        savePhasesState();
+                    }
+                });
+
+                // Add double-click to edit deliverable text
+                const label = li.querySelector('label');
+                label.addEventListener('dblclick', async (event) => { // Made async for modal
+                    event.stopPropagation(); // Prevent the dblclick from propagating to the checkbox
+                    const currentText = phasesState[phaseKey].deliverables[index].text;
+                    const newText = await showPromptModal("Edit deliverable text:", "Deliverable text...", currentText);
+                    if (newText !== null && newText.trim() !== '') { // Check for null (cancel) and empty string
+                        phasesState[phaseKey].deliverables[index].text = newText.trim();
+                        updatePhaseUI(phaseKey); // Re-render to update the label
+                        savePhasesState();
+                    } else if (newText !== null && newText.trim() === '') {
+                        await showAlertModal("Deliverable text cannot be empty. Edit cancelled.");
+                    }
+                });
+            });
+
+            // Attach event listener for "Add Deliverable" button
+            if (!addDeliverableButton.dataset.listenerAttached) {
+                addDeliverableButton.addEventListener('click', async () => { // Made async for modal
+                    const newDeliverableText = await showPromptModal("Enter new deliverable text:", "Deliverable text...");
+                    if (newDeliverableText !== null && newDeliverableText.trim() !== '') { // Check for null (cancel) and empty string
+                        phasesState[phaseKey].deliverables.push({ text: newDeliverableText.trim(), completed: false });
+                        updatePhaseUI(phaseKey);
+                        savePhasesState();
+                    } else if (newDeliverableText !== null && newDeliverableText.trim() === '') {
+                        await showAlertModal("Deliverable text cannot be empty. No deliverable added.");
+                    }
+                });
+                addDeliverableButton.dataset.listenerAttached = 'true';
+            }
+
+            // Update notes and document link fields
+            notesTextarea.value = currentNotes || '';
+            documentLinkInput.value = currentDocumentLink || '';
+
+            // Update document link preview
+            if (currentDocumentLink && currentDocumentLink.trim() !== '') {
+                                documentLinkPreview.href = currentDocumentLink;
+                documentLinkPreview.style.display = 'block';
+            } else {
+                documentLinkPreview.style.display = 'none';
+            }
+
+            // Attach event listeners for notes and document link (only once as they are static elements)
+            if (!notesTextarea.dataset.notesListenerAttached) {
+                notesTextarea.addEventListener('input', debounce((event) => {
+                    console.log(`[Event] Notes changed for ${phaseKey}. New value: ${event.target.value}`);
+                    phasesState[phaseKey].notes = event.target.value;
+                    savePhasesState();
+                }, 500));
+                notesTextarea.dataset.notesListenerAttached = 'true';
+            }
+
+            if (!documentLinkInput.dataset.docLinkListenerAttached) {
+                documentLinkInput.addEventListener('input', debounce((event) => {
+                    console.log(`[Event] Document link changed for ${phaseKey}. New value: ${event.target.value}`);
+                    phasesState[phaseKey].documentLink = event.target.value;
+                    // Update link preview immediately
+                    if (event.target.value && event.target.value.trim() !== '') {
+                        documentLinkPreview.href = event.target.value;
+                        documentLinkPreview.style.display = 'block';
+                    } else {
+                        documentLinkPreview.style.display = 'none';
+                    }
+                    savePhasesState();
+                }, 500));
+                documentLinkInput.dataset.docLinkListenerAttached = 'true';
+            }
+        }
+
+        /**
+         * Toggles the status of a specific phase (Completed <-> Not Started/In Progress).
+         * This button will now also toggle all deliverables within the phase.
+         * @param {string} phaseKey - The key of the phase to toggle (e.g., 'phase-1').
+         */
+        function togglePhaseStatus(phaseKey) {
+            console.log(`[Event] Toggling main phase button for ${phaseKey}`);
+            const currentStatus = phasesState[phaseKey].status;
+            
+            let newStatus;
+            let newProgress;
+            let newDeliverablesState = [];
+
+            if (currentStatus === 'Completed') {
+                newStatus = 'Not Started';
+                newProgress = 0;
+                // Uncheck all deliverables
+                phasesState[phaseKey].deliverables.forEach(d => {
+                    newDeliverablesState.push({ text: d.text, completed: false });
+                });
+            } else {
+                newStatus = 'Completed';
+                newProgress = 100;
+                // Check all deliverables
+                phasesState[phaseKey].deliverables.forEach(d => {
+                    newDeliverablesState.push({ text: d.text, completed: true });
+                });
+            }
+
+            phasesState[phaseKey].status = newStatus;
+            phasesState[phaseKey].progress = newProgress;
+            phasesState[phaseKey].deliverables = newDeliverablesState; // Update deliverables state
+            // Notes and document links are not toggled by this button, they retain their values
+
+            // Update UI for this specific phase
+            updatePhaseUI(phaseKey);
+
+            // Recalculate and update overall progress
+            const { averageProgress, overallStatus } = calculateOverallProgress();
+            updateOverallProgressUI(averageProgress, overallStatus);
+
+            // Save the updated state to localStorage
+            savePhasesState();
+        }
+
+        /**
+         * Exports the current phasesState to a JSON file.
+         */
+        function exportData() {
+            const data = JSON.stringify(phasesState, null, 2); // Pretty print JSON
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'founder_launchpad_data.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            console.log("[Data Management] Data exported.");
+        }
+
+        /**
+         * Imports data from a selected JSON file.
+         * @param {Event} event - The file input change event.
+         */
+        async function importData(event) { // Made async for modal
+            const file = event.target.files[0];
+            if (!file) {
+                await showAlertModal("Please select a JSON file to import.");
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = async (e) => { // Made async for modal
+                try {
+                    const importedState = JSON.parse(e.target.result);
+                    // Basic validation: Check if it's an object and has expected phase keys
+                    if (typeof importedState === 'object' && importedState !== null && Object.keys(importedState).length === 5 && Object.keys(importedState).every(key => key.startsWith('phase-'))) {
+                        const confirmed = await showConfirmModal("Are you sure you want to import this data? Your current progress will be overwritten.");
+                        if (confirmed) {
+                            phasesState = importedState;
+                            savePhasesState(); // Save imported data to localStorage
+                            // Re-render all UI elements to reflect imported data
+                            for (let i = 1; i <= 5; i++) {
+                                updatePhaseUI(`phase-${i}`);
+                            }
+                            updateOverallProgressUI(calculateOverallProgress().averageProgress, calculateOverallProgress().overallStatus);
+                            await showAlertModal("Data imported successfully!");
+                            console.log("[Data Management] Data imported and UI updated.");
+                        }
+                    } else {
+                        await showAlertModal("Invalid JSON file format. Please ensure it's a valid Founder's Launchpad data export.");
+                        console.error("[Data Management Error] Invalid imported JSON structure.");
+                    }
+                } catch (error) {
+                    await showAlertModal("Error parsing JSON file. Please ensure it's a valid JSON format.");
+                    console.error("[Data Management Error] Error parsing imported file:", error);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        /**
+         * Resets all application data to its default state.
+         */
+        async function resetAllData() { // Made async for modal
+            const confirmed = await showConfirmModal("Are you sure you want to reset all data? This action cannot be undone.");
+            if (confirmed) {
+                localStorage.removeItem('founderLaunchpadPhases'); // Clear from local storage
+                initializePhasesState(); // Re-initialize with default data
+                for (let i = 1; i <= 5; i++) {
+                    updatePhaseUI(`phase-${i}`); // Re-render all phases
+                }
+                updateOverallProgressUI(calculateOverallProgress().averageProgress, calculateOverallProgress().overallStatus);
+                await showAlertModal("All data has been reset to default.");
+                console.log("[Data Management] All data reset.");
+            }
+        }
+
+        // Initialize the application on window load
+        window.onload = function() {
+            console.log("[App Init] Window loaded, initializing UI and Local Storage.");
+            loadingOverlay.style.display = 'none'; // Hide loading overlay immediately
+
+            // Initialize phasesState from localStorage or defaults
+            initializePhasesState();
+
+            // Initial UI update for all phases based on loaded/default state
+            for (let i = 1; i <= 5; i++) {
+                const phaseKey = `phase-${i}`;
+                updatePhaseUI(phaseKey); // Update each phase's UI based on current state
+            }
+
+            // Initial overall progress update
+            const { averageProgress, overallStatus } = calculateOverallProgress();
+            updateOverallProgressUI(averageProgress, overallStatus);
+
+            // Attach event listeners to phase toggle buttons
+            for (let i = 1; i <= 5; i++) {
+                const button = document.getElementById(`phase-${i}-toggle-button`);
+                if (button && !button.dataset.listenerAttached) { // Prevent attaching multiple times
+                    button.addEventListener('click', () => togglePhaseStatus(`phase-${i}`));
+                    button.dataset.listenerAttached = 'true';
+                    console.log(`[Event] Attached toggle button listener for phase-${i}`);
+                }
+            }
+
+            // Attach event listeners for Export/Import/Reset buttons
+            exportDataButton.addEventListener('click', exportData);
+            importDataButton.addEventListener('click', () => importFileInput.click()); // Trigger file input click
+            importFileInput.addEventListener('change', importData);
+            resetDataButton.addEventListener('click', resetAllData); // Attach reset listener
+            console.log("[Data Management] Export/Import/Reset listeners attached.");
+        };
+    </script>
+</body>
+</html>
